@@ -41,9 +41,10 @@ let substances_meshes = [];
 let selectedSubstance = null;
 let hoveredSubstance = null;
 let isUIOpen = false;
-let flickerLight;
+let flickerLight, selectionLight;
 let scrollY = 0;
 let particles = [];
+let targetFOV = 75;
 
 /**
  * PARTICLE SYSTEM
@@ -148,6 +149,10 @@ function init() {
     flickerLight.decay = 1;
     flickerLight.distance = 30;
     scene.add(flickerLight);
+
+    // Selection Light (for bloom effect)
+    selectionLight = new THREE.PointLight(0xffffff, 0, 10);
+    scene.add(selectionLight);
 
     // The Table
     const tableGeo = new THREE.CylinderGeometry(5, 5, 0.5, 64);
@@ -289,18 +294,31 @@ function openUI(data) {
     ui.classList.add('visible');
     ui.classList.remove('hidden');
     
-    // Zoom camera slightly
+    // Staggered text animation
+    const sections = document.querySelectorAll('.data-section');
+    sections.forEach(s => s.classList.add('animate'));
+    
+    // Zoom camera dramatically
+    targetFOV = 55;
     controls.autoRotate = false;
 }
 
 function closeUI() {
     isUIOpen = false;
     document.getElementById('ui-overlay').classList.remove('visible');
+    
+    // Reset staggered animations
+    const sections = document.querySelectorAll('.data-section');
+    sections.forEach(s => s.classList.remove('animate'));
+
     setTimeout(() => {
         if (!isUIOpen) document.getElementById('ui-overlay').classList.add('hidden');
     }, 300);
     selectedSubstance = null;
     
+    // Reset FOV
+    targetFOV = 75;
+
     // Re-enable auto-rotation
     controls.autoRotate = true;
 }
@@ -310,6 +328,12 @@ function animate() {
 
     const elapsedTime = clock.getElapsedTime();
     const scrollProgress = Math.min(scrollY / window.innerHeight, 1);
+
+    // Smooth FOV transition
+    if (Math.abs(camera.fov - targetFOV) > 0.1) {
+        camera.fov = THREE.MathUtils.lerp(camera.fov, targetFOV, 0.1);
+        camera.updateProjectionMatrix();
+    }
 
     // Camera position based on scroll or selection
     if (!isUIOpen) {
@@ -331,12 +355,19 @@ function animate() {
         } else {
             controls.enabled = true;
         }
+        
+        selectionLight.intensity = 0;
     } else if (selectedSubstance) {
         // Smooth zoom to selected substance
-        const targetPos = selectedSubstance.position.clone().add(new THREE.Vector3(0, 1, 3));
+        const targetPos = selectedSubstance.position.clone().add(new THREE.Vector3(0, 2, 6));
         camera.position.lerp(targetPos, 0.05);
         camera.lookAt(selectedSubstance.position);
         controls.enabled = false; // Disable orbit controls during focus
+
+        // Update selection light for bloom effect
+        selectionLight.position.copy(selectedSubstance.position);
+        selectionLight.color.setHex(selectedSubstance.userData.color);
+        selectionLight.intensity = THREE.MathUtils.lerp(selectionLight.intensity, 50, 0.05);
     }
 
     // Update particles
@@ -403,8 +434,8 @@ function animate() {
         }
 
         if (mesh === selectedSubstance) {
-            targetEmissive = 1.0;
-            targetScale = 1.2;
+            targetEmissive = 3.0;
+            targetScale = 1.3;
         }
 
         // Smooth transition for emissive intensity
