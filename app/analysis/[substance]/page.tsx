@@ -1,3 +1,4 @@
+/// <reference types="@react-three/fiber" />
 'use client';
 
 import { notFound } from 'next/navigation';
@@ -189,7 +190,8 @@ function PDBModel({ fileName, color, modelScale = 1 }: { fileName: string; color
         </mesh>
       ))}
       {hasBonds && (
-        <lineSegments geometry={pdb.geometryBonds}>
+        <lineSegments>
+          <primitive object={pdb.geometryBonds} attach="geometry" />
           <lineBasicMaterial color={color} transparent opacity={0.4} />
         </lineSegments>
       )}
